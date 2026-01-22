@@ -1,8 +1,8 @@
 {
-  description = "A simple Go package";
+  description = "An openmensa compatible webserver for the Studierendenwerk Bonn ";
 
   # Nixpkgs / NixOS version to use.
-  inputs.nixpkgs.url = "nixpkgs/nixos-21.11";
+  inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
 
   outputs = { self, nixpkgs }:
     let
@@ -32,7 +32,7 @@
         in
         {
           go-hello = pkgs.buildGoModule {
-            pname = "go-hello";
+            pname = "stwb-openmensa";
             inherit version;
             # In 'nix develop', we don't need a copy of the source tree
             # in the Nix store.
