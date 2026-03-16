@@ -1,3 +1,3 @@
-module example.com/go-hello
+module github.com/alexanderwallau/stwb-openmensa
 
-go 1.16
+go 1.21

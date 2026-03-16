@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// ─── Cache ────────────────────────────────────────────────────────────────────
+// ─── Cache
 
 type cacheEntry struct {
 	data    []byte
@@ -58,7 +58,7 @@ func (c *cache) evictExpired() {
 // cacheTTL is the maximum time a response is cached (past dates never change).
 const cacheTTL = 365 * 24 * time.Hour
 
-// ─── OpenMensa XML generation ─────────────────────────────────────────────────
+// ─── OpenMensa XML generation 
 
 // xmlDay and its children map to the OpenMensa v2 XML schema.
 // The root <openmensa> element is written as a raw string to avoid namespace issues.
