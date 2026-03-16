@@ -23,6 +23,104 @@ var canteenIDs = map[string]string{
 	"Rheinbach":          "22",
 }
 
+// CanteenInfo holds static metadata for a canteen.
+type CanteenInfo struct {
+	Name      string
+	Address   string
+	City      string
+	Phone     string
+	Latitude  float64
+	Longitude float64
+	// Hours contains opening hours for Mon–Sun (index 0=Mon … 6=Sun).
+	// An empty string means closed that day.
+	Hours [7]string
+}
+
+// canteenInfoMap holds the static metadata for each canteen.
+var canteenInfoMap = map[string]CanteenInfo{
+	"SanktAugustin": {
+		Name:      "Mensa Sankt Augustin",
+		Address:   "Grantham-Allee 20, 53757 Sankt Augustin",
+		City:      "Sankt Augustin",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.7740,
+		Longitude: 7.1880,
+		Hours:     [7]string{"11:30-14:00", "11:30-14:00", "11:30-14:00", "11:30-14:00", "11:30-14:00", "", ""},
+	},
+	"CAMPO": {
+		Name:      "Mensa CAMPO",
+		Address:   "Endenicher Allee 19, 53115 Bonn",
+		City:      "Bonn",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.7287,
+		Longitude: 7.0855,
+		Hours:     [7]string{"11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:00", "", ""},
+	},
+	"Hofgarten": {
+		Name:      "Mensa am Hofgarten",
+		Address:   "Regina-Pacis-Weg 3, 53113 Bonn",
+		City:      "Bonn",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.7361,
+		Longitude: 7.1018,
+		Hours:     [7]string{"11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:30", "", ""},
+	},
+	"FoodtruckRheinbach": {
+		Name:      "Foodtruck Rheinbach",
+		Address:   "Von-Liebig-Straße 20, 53359 Rheinbach",
+		City:      "Rheinbach",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.6244,
+		Longitude: 6.9497,
+		Hours:     [7]string{"11:30-14:00", "11:30-14:00", "11:30-14:00", "11:30-14:00", "11:30-14:00", "", ""},
+	},
+	"VenusbergBistro": {
+		Name:      "venusberg bistro",
+		Address:   "Venusberg-Campus 1, 53127 Bonn",
+		City:      "Bonn",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.7013,
+		Longitude: 7.1218,
+		Hours:     [7]string{"08:30-15:00", "08:30-15:00", "08:30-15:00", "08:30-15:00", "08:30-15:00", "08:30-15:00", ""},
+	},
+	"CasinoZEFZEI": {
+		Name:      "Casino ZEF/ZEI",
+		Address:   "Genscherallee 3, 53113 Bonn",
+		City:      "Bonn",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.7270,
+		Longitude: 7.0971,
+		Hours:     [7]string{"12:00-15:00", "12:00-15:00", "12:00-15:00", "12:00-15:00", "12:00-15:00", "", ""},
+	},
+	"Foodtruck": {
+		Name:      "Foodtruck",
+		Address:   "Endenicher Allee 19, 53115 Bonn",
+		City:      "Bonn",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.7287,
+		Longitude: 7.0855,
+		Hours:     [7]string{"11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:00", "", ""},
+	},
+	"Rabinstrasse": {
+		Name:      "Leah's World Cafe",
+		Address:   "Rabinstraße 8, 53111 Bonn",
+		City:      "Bonn",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.7260,
+		Longitude: 7.0982,
+		Hours:     [7]string{"08:00-16:00", "08:00-16:00", "08:00-16:00", "08:00-16:00", "08:00-16:00", "", ""},
+	},
+	"Rheinbach": {
+		Name:      "Mensa Rheinbach",
+		Address:   "Von-Liebig-Straße 20, 53359 Rheinbach",
+		City:      "Rheinbach",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.6244,
+		Longitude: 6.9497,
+		Hours:     [7]string{"11:30-14:00", "11:30-14:00", "11:30-14:00", "11:30-14:00", "11:30-14:00", "", ""},
+	},
+}
+
 const mensaURL = "https://www.studierendenwerk-bonn.de/?type=1732731666"
 
 // Meal holds a single menu item and its metadata.

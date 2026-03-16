@@ -85,19 +85,40 @@ type xmlPrice struct {
 	Value string `xml:",chardata"`
 }
 
-const omHeader = `<?xml version="1.0" encoding="UTF-8"?>
+const omProlog = `<?xml version="1.0" encoding="UTF-8"?>
 <openmensa version="2.1"
   xmlns="http://openmensa.org/open-mensa-v2"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://openmensa.org/open-mensa-v2 http://openmensa.org/open-mensa-v2.xsd">
-  <version>1.0</version>
-  <canteen>`
+  <version>1.0</version>`
 
-const omFooter = `
-  </canteen>
-</openmensa>`
+const omEpilog = `</openmensa>`
 
-func buildXML(date string, cats []*Category) ([]byte, error) {
+var weekdayNames = [7]string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+
+func metadataXML(info CanteenInfo) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "    <name>%s</name>\n", info.Name)
+	fmt.Fprintf(&b, "    <address>%s</address>\n", info.Address)
+	fmt.Fprintf(&b, "    <city>%s</city>\n", info.City)
+	if info.Phone != "" {
+		fmt.Fprintf(&b, "    <phone>%s</phone>\n", info.Phone)
+	}
+	fmt.Fprintf(&b, "    <location latitude=\"%.4f\" longitude=\"%.4f\"/>\n", info.Latitude, info.Longitude)
+	b.WriteString("    <availability>public</availability>\n")
+	b.WriteString("    <times type=\"opening\">\n")
+	for i, day := range weekdayNames {
+		if info.Hours[i] != "" {
+			fmt.Fprintf(&b, "      <%s open=\"%s\"/>\n", day, info.Hours[i])
+		} else {
+			fmt.Fprintf(&b, "      <%s closed=\"true\"/>\n", day)
+		}
+	}
+	b.WriteString("    </times>\n")
+	return b.String()
+}
+
+func buildXML(canteen, date string, cats []*Category) ([]byte, error) {
 	day := xmlDay{Date: date}
 	for _, cat := range cats {
 		xcat := xmlCategory{Name: cat.Title}
@@ -128,10 +149,14 @@ func buildXML(date string, cats []*Category) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	buf.WriteString(omHeader)
-	buf.WriteByte('\n')
+	buf.WriteString(omProlog)
+	buf.WriteString("\n  <canteen>\n")
+	if info, ok := canteenInfoMap[canteen]; ok {
+		buf.WriteString(metadataXML(info))
+	}
 	buf.Write(dayXML)
-	buf.WriteString(omFooter)
+	buf.WriteString("\n  </canteen>\n")
+	buf.WriteString(omEpilog)
 	return buf.Bytes(), nil
 }
 
@@ -162,7 +187,7 @@ func (s *server) fetch(canteen, date string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := buildXML(date, cats)
+	data, err := buildXML(canteen, date, cats)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +203,7 @@ func (s *server) refresh(canteen, date string) {
 		log.Printf("refresh %s/%s: %v", canteen, date, err)
 		return
 	}
-	data, err := buildXML(date, cats)
+	data, err := buildXML(canteen, date, cats)
 	if err != nil {
 		log.Printf("buildXML %s/%s: %v", canteen, date, err)
 		return
