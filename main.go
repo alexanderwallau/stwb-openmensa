@@ -232,6 +232,22 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// clientIP returns the real client IP, preferring X-Real-IP and
+// X-Forwarded-For headers set by a reverse proxy.
+func clientIP(r *http.Request) string {
+	if ip := r.Header.Get("X-Real-IP"); ip != "" {
+		return ip
+	}
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		// X-Forwarded-For may be a comma-separated list; the first is the client.
+		if idx := strings.IndexByte(fwd, ','); idx != -1 {
+			return strings.TrimSpace(fwd[:idx])
+		}
+		return strings.TrimSpace(fwd)
+	}
+	return r.RemoteAddr
+}
+
 func (s *server) handleList(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	for name := range canteenIDs {
@@ -251,7 +267,7 @@ func (s *server) handleMenu(w http.ResponseWriter, r *http.Request, canteen, dat
 
 	data, err := s.getOrFetch(canteen, date)
 	if err != nil {
-		log.Printf("ERROR %s %s: %v", r.Method, r.URL, err)
+		log.Printf("ERROR %s %s %s: %v", clientIP(r), r.Method, r.URL, err)
 		http.Error(w, "upstream error: "+err.Error(), http.StatusBadGateway)
 		return
 	}
