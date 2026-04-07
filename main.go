@@ -6,8 +6,10 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -251,10 +253,117 @@ func clientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
+var homeTmplFuncs = template.FuncMap{
+	"price": func(cents int) string {
+		if cents == 0 {
+			return "–"
+		}
+		return fmt.Sprintf("%.2f €", float64(cents)/100)
+	},
+	"notes": func(m *Meal) string {
+		all := append(m.Allergens, m.Additives...)
+		return strings.Join(all, ", ")
+	},
+}
+
+var homeTmpl = template.Must(template.New("home").Funcs(homeTmplFuncs).Parse(`<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mensa Bonn – {{.Date}}</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;margin:0;padding:1rem 2rem;background:#f5f5f5;color:#222}
+h1{margin-bottom:.25rem}
+p.date{color:#555;margin-top:0}
+section{background:#fff;border-radius:6px;padding:1rem 1.25rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+h2{margin:.0 0 .75rem;font-size:1.1rem}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th{text-align:left;padding:.35rem .5rem;border-bottom:2px solid #ddd;white-space:nowrap}
+td{padding:.3rem .5rem;border-bottom:1px solid #eee;vertical-align:top}
+td.price{text-align:right;white-space:nowrap}
+.notes{color:#666;font-size:.8rem}
+.empty{color:#999;font-style:italic}
+</style>
+</head>
+<body>
+<h1>Mensen Studierendenwerk Bonn</h1>
+<p class="date">{{.Date}}</p>
+{{range .Canteens}}
+<section>
+  <h2>{{.DisplayName}}</h2>
+  {{if .Cats}}
+  <table>
+    <thead><tr><th>Kategorie</th><th>Gericht</th><th>Hinweise</th><th>Stud.</th><th>Bed.</th><th>Gast</th></tr></thead>
+    <tbody>
+    {{range .Cats}}{{$cat := .Title}}{{range .Meals}}<tr>
+      <td>{{$cat}}</td>
+      <td>{{.Title}}</td>
+      <td class="notes">{{notes .}}</td>
+      <td class="price">{{price .StudentPrice}}</td>
+      <td class="price">{{price .StaffPrice}}</td>
+      <td class="price">{{price .GuestPrice}}</td>
+    </tr>{{end}}{{end}}
+    </tbody>
+  </table>
+  {{else}}<p class="empty">Keine Angebote / geschlossen</p>{{end}}
+</section>
+{{end}}
+</body></html>
+`))
+
+type canteenPage struct {
+	DisplayName string
+	Cats        []*Category
+}
+
+type homePage struct {
+	Date     string
+	Canteens []canteenPage
+}
+
 func (s *server) handleList(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	for name := range canteenIDs {
-		fmt.Fprintln(w, name)
+	today := time.Now().Format("2006-01-02")
+
+	// Fetch all canteen menus concurrently.
+	type result struct {
+		slug string
+		cats []*Category
+	}
+	slugs := make([]string, 0, len(canteenIDs))
+	for slug := range canteenIDs {
+		slugs = append(slugs, slug)
+	}
+	sort.Strings(slugs)
+
+	results := make([]result, len(slugs))
+	var wg sync.WaitGroup
+	for i, slug := range slugs {
+		wg.Add(1)
+		go func(i int, slug string) {
+			defer wg.Done()
+			cats, err := FetchMenu(slug, today)
+			if err != nil {
+				log.Printf("homepage fetch %s: %v", slug, err)
+			}
+			results[i] = result{slug, cats}
+		}(i, slug)
+	}
+	wg.Wait()
+
+	page := homePage{Date: today}
+	for _, r := range results {
+		name := r.slug
+		if info, ok := canteenInfoMap[r.slug]; ok {
+			name = info.Name
+		}
+		page.Canteens = append(page.Canteens, canteenPage{DisplayName: name, Cats: r.cats})
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := homeTmpl.Execute(w, page); err != nil {
+		log.Printf("template: %v", err)
 	}
 }
 
