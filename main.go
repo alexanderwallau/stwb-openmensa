@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"encoding/xml"
 	"flag"
 	"fmt"
@@ -165,6 +166,7 @@ func buildXML(canteen, date string, cats []*Category) ([]byte, error) {
 type server struct {
 	cache    *cache
 	fetchMu  sync.Mutex // serialises cache-miss fetches to avoid stampedes
+	baseURL  string     // e.g. "https://example.com" — no trailing slash
 }
 
 func (s *server) getOrFetch(canteen, date string) ([]byte, error) {
@@ -215,17 +217,18 @@ func (s *server) refresh(canteen, date string) {
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 
-	// Route: /                → list canteens
-	// Route: /{canteen}       → today's menu
-	// Route: /{canteen}/{date}→ menu for specific date
-	switch len(parts) {
-	case 1:
-		if parts[0] == "" {
-			s.handleList(w, r)
-			return
-		}
+	// Route: /                        → list canteens (plain text)
+	// Route: /canteens/index.json     → canteen index (JSON)
+	// Route: /{canteen}               → today's menu
+	// Route: /{canteen}/{date}        → menu for specific date
+	switch {
+	case len(parts) == 1 && parts[0] == "":
+		s.handleList(w, r)
+	case len(parts) == 2 && parts[0] == "canteens" && parts[1] == "index.json":
+		s.handleIndex(w, r)
+	case len(parts) == 1:
 		s.handleMenu(w, r, parts[0], time.Now().Format("2006-01-02"))
-	case 2:
+	case len(parts) == 2:
 		s.handleMenu(w, r, parts[0], parts[1])
 	default:
 		http.NotFound(w, r)
@@ -253,6 +256,29 @@ func (s *server) handleList(w http.ResponseWriter, _ *http.Request) {
 	for name := range canteenIDs {
 		fmt.Fprintln(w, name)
 	}
+}
+
+func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	base := s.baseURL
+	if base == "" {
+		scheme := "http"
+		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+			scheme = "https"
+		}
+		host := r.Host
+		if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" {
+			host = fwd
+		}
+		base = scheme + "://" + host
+	}
+
+	index := make(map[string]string, len(canteenIDs))
+	for name := range canteenIDs {
+		index[name] = base + "/" + name
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(index)
 }
 
 func (s *server) handleMenu(w http.ResponseWriter, r *http.Request, canteen, date string) {
@@ -330,6 +356,7 @@ func (s *server) runScheduler(refreshTimes [][2]int) {
 func main() {
 	port := flag.Int("port", 8080, "TCP port to listen on")
 	listen := flag.String("listen", "127.0.0.1", "address to listen on")
+	baseURL := flag.String("base-url", "", "base URL of this server (e.g. https://example.com); auto-detected from request host if empty")
 	refreshStr := flag.String("refresh", "07:00,11:00,14:00,17:00",
 		"comma-separated HH:MM times to refresh today's menu (local time)")
 	flag.Parse()
@@ -339,7 +366,7 @@ func main() {
 		log.Fatal("no valid refresh times parsed from --refresh flag")
 	}
 
-	srv := &server{cache: newCache()}
+	srv := &server{cache: newCache(), baseURL: strings.TrimRight(*baseURL, "/")}
 
 	// Background scheduler refreshes today's data at configured times.
 	go srv.runScheduler(refreshTimes)
