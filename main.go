@@ -317,7 +317,7 @@ td.price{text-align:right;white-space:nowrap}
 <p class="date">{{.Date}}</p>
 {{range .Canteens}}
 <section>
-  <h2>{{.DisplayName}}</h2>
+  <h2>{{.DisplayName}} <a href="/{{.Slug}}/{{$.Date}}" style="font-size:.8rem;font-weight:normal;color:#888">XML</a></h2>
   {{if .Cats}}
   <table>
     <thead><tr><th>Kategorie</th><th>Gericht</th><th>Hinweise</th><th>Stud.</th><th>Bed.</th><th>Gast</th></tr></thead>
@@ -340,6 +340,7 @@ td.price{text-align:right;white-space:nowrap}
 
 type canteenPage struct {
 	DisplayName string
+	Slug        string
 	Cats        []*Category
 }
 
@@ -383,7 +384,7 @@ func (s *server) handleList(w http.ResponseWriter, _ *http.Request) {
 		if info, ok := canteenInfoMap[r.slug]; ok {
 			name = info.Name
 		}
-		page.Canteens = append(page.Canteens, canteenPage{DisplayName: name, Cats: r.cats})
+		page.Canteens = append(page.Canteens, canteenPage{DisplayName: name, Slug: r.slug, Cats: r.cats})
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
