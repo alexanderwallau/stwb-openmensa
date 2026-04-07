@@ -12,10 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          # Nix Flakes doesn't work on shallow clones
-          fetch-depth: 0
+        uses: actions/checkout@v4
 
       - name: Docker meta
         id: meta
@@ -29,50 +26,9 @@ jobs:
             type=semver,pattern={{major}}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@v3
 
-      # check if qemu is working
-      - name: Test binfmt availability
-        run: |
-          cat /proc/sys/fs/binfmt_misc/qemu-aarch64
-
-      # build package in this stage
-      # -> makes this workflow fail faster
-      - name: nix build .#ubo_iz_config_gen
-        run: |
-          nix build .#packages.${{ matrix.arch }}-linux.${{ secrets.DOCKER_HUB_REPO }}
-
-      - name: build docker image
-        run: |
-          nix build .#packages.${{ matrix.arch }}-linux.docker-image
-
-      - name: set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: load docker image
-        run: |
-          docker load < result
-
-      - name: show docker images
-        run: |
-          docker images
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-      - name: push docker image
-        run: |
-          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:latest ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:${{ matrix.arch }}-latest
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:${{ matrix.arch }}-latest
-
-  manifest-create:
-    needs: [build-docker]
-    runs-on: ubuntu-latest
-    steps:
-      - name: set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
@@ -81,27 +37,8 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: create manifest
-        run: |
-          docker manifest create \
-          "${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:latest" \
-          --amend ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:x86_64-latest \
-          --amend ${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:aarch64-latest
-
-      - name: push manifest
-        run: |
-          docker manifest push "${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPO }}:latest"
-
-  tag-images:
-    needs: [build-docker]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - name: set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v4
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/386,linux/ppc64le,linux/s390x
