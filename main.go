@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -61,7 +62,21 @@ func (c *cache) evictExpired() {
 // cacheTTL is the maximum time a response is cached (past dates never change).
 const cacheTTL = 365 * 24 * time.Hour
 
-// ─── OpenMensa XML generation 
+// ─── OpenMensa XML generation
+
+// codeRe matches the last parenthesised group in an allergen/additive label,
+// e.g. "Knoblauch (Kno)" → "Kno", "Schalenfrüchte (Nüsse) (47)" → "47".
+var codeRe = regexp.MustCompile(`\(([^)]+)\)\s*$`)
+
+// shortCode extracts the code from an allergen/additive string.
+// Falls back to the full string if no parenthesised group is found.
+func shortCode(s string) string {
+	if m := codeRe.FindStringSubmatch(s); m != nil {
+		return m[1]
+	}
+	return s
+}
+
 
 // xmlDay and its children map to the OpenMensa v2 XML schema.
 // The root <openmensa> element is written as a raw string to avoid namespace issues.
@@ -126,12 +141,15 @@ func buildXML(canteen, date string, cats []*Category) ([]byte, error) {
 	for _, cat := range cats {
 		xcat := xmlCategory{Name: cat.Title}
 		for _, m := range cat.Meals {
-			// Combine allergens and additives into individual notes, mirroring the
-			// Python implementation's behaviour of joining them as a single note.
+			// Combine allergens and additives, shortened to their codes for the XML.
 			var notes []string
 			combined := append(m.Allergens, m.Additives...)
 			if len(combined) > 0 {
-				notes = []string{strings.Join(combined, ", ")}
+				codes := make([]string, len(combined))
+				for i, s := range combined {
+					codes[i] = shortCode(s)
+				}
+				notes = []string{strings.Join(codes, ", ")}
 			}
 			xcat.Meals = append(xcat.Meals, xmlMeal{
 				Name:  m.Title,
@@ -146,19 +164,26 @@ func buildXML(canteen, date string, cats []*Category) ([]byte, error) {
 		day.Categories = append(day.Categories, xcat)
 	}
 
-	dayXML, err := xml.MarshalIndent(day, "    ", "  ")
-	if err != nil {
-		return nil, err
-	}
-
 	var buf bytes.Buffer
 	buf.WriteString(omProlog)
 	buf.WriteString("\n  <canteen>\n")
 	if info, ok := canteenInfoMap[canteen]; ok {
 		buf.WriteString(metadataXML(info))
 	}
-	buf.Write(dayXML)
-	buf.WriteString("\n  </canteen>\n")
+
+	if len(day.Categories) == 0 {
+		// Schema requires <closed/> when there are no offerings.
+		fmt.Fprintf(&buf, "    <day date=%q><closed/></day>\n", date)
+	} else {
+		dayXML, err := xml.MarshalIndent(day, "    ", "  ")
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(dayXML)
+		buf.WriteByte('\n')
+	}
+
+	buf.WriteString("  </canteen>\n")
 	buf.WriteString(omEpilog)
 	return buf.Bytes(), nil
 }
