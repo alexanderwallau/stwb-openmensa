@@ -2,7 +2,6 @@ name: update-flake-lock
 on:
   workflow_dispatch:
   schedule:
-    # Once a month on the first, should be plenty often in this case
     - cron: "0 0 1 * 0"
 
 jobs:
