@@ -77,7 +77,6 @@ func shortCode(s string) string {
 	return s
 }
 
-
 // xmlDay and its children map to the OpenMensa v2 XML schema.
 // The root <openmensa> element is written as a raw string to avoid namespace issues.
 
@@ -191,9 +190,9 @@ func buildXML(canteen, date string, cats []*Category) ([]byte, error) {
 // ─── HTTP server ──────────────────────────────────────────────────────────────
 
 type server struct {
-	cache    *cache
-	fetchMu  sync.Mutex // serialises cache-miss fetches to avoid stampedes
-	baseURL  string     // e.g. "https://example.com" — no trailing slash
+	cache   *cache
+	fetchMu sync.Mutex // serialises cache-miss fetches to avoid stampedes
+	baseURL string     // e.g. "https://example.com" — no trailing slash
 }
 
 func (s *server) getOrFetch(canteen, date string) ([]byte, error) {

@@ -247,7 +247,7 @@ func (p *mensaParser) tag(tag, rawAttrs string) {
 		// else: keep current mode so allergens after a <p> still parse
 	case "th":
 		p.mode = mPriceCat
-	// br, td: no mode change
+		// br, td: no mode change
 	}
 }
 
