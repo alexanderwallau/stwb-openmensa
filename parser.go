@@ -19,6 +19,7 @@ var canteenIDs = map[string]string{
 	"VenusbergBistro":    "6",
 	"CasinoZEFZEI":       "8",
 	"Foodtruck":          "19",
+	"FoodtruckULB":       "471",
 	"Rabinstrasse":       "21",
 	"Rheinbach":          "22",
 }
@@ -100,6 +101,15 @@ var canteenInfoMap = map[string]CanteenInfo{
 		Latitude:  50.7287,
 		Longitude: 7.0855,
 		Hours:     [7]string{"11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:00", "", ""},
+	},
+	"FoodtruckULB": {
+		Name:      "Foodtruck ULB",
+		Address:   "Adenauerallee 39-41, 53113 Bonn",
+		City:      "Bonn",
+		Phone:     "+49 228 73-7131",
+		Latitude:  50.7314,
+		Longitude: 7.1087,
+		Hours:     [7]string{"11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:30", "11:30-14:30", "", ""},
 	},
 	"Rabinstrasse": {
 		Name:      "Leah's World Cafe",
