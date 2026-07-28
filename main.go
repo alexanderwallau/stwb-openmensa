@@ -24,12 +24,9 @@ type cacheEntry struct {
 }
 
 type cache struct {
-	mu    sync.RWMutex
-	items map[string]cacheEntry
-}
-
-func newCache() *cache {
-	return &cache{items: make(map[string]cacheEntry)}
+	mu        sync.RWMutex
+	items     map[string]cacheEntry
+	cacheFile string
 }
 
 func (c *cache) get(key string) ([]byte, bool) {
@@ -46,15 +43,26 @@ func (c *cache) set(key string, data []byte, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.items[key] = cacheEntry{data: data, expires: time.Now().Add(ttl)}
+	if err := c.saveLocked(); err != nil {
+		// A failed optional cache write must not make the current menu request fail.
+		log.Printf("persist cache: %v", err)
+	}
 }
 
 func (c *cache) evictExpired() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	now := time.Now()
+	changed := false
 	for k, e := range c.items {
 		if now.After(e.expires) {
 			delete(c.items, k)
+			changed = true
+		}
+	}
+	if changed {
+		if err := c.saveLocked(); err != nil {
+			log.Printf("persist cache: %v", err)
 		}
 	}
 }
@@ -491,6 +499,7 @@ func main() {
 	port := flag.Int("port", 8080, "TCP port to listen on")
 	listen := flag.String("listen", "127.0.0.1", "address to listen on")
 	baseURL := flag.String("base-url", "", "base URL of this server (e.g. https://example.com); auto-detected from request host if empty")
+	cacheDir := flag.String("cache-dir", "", "directory for persistent cached menu responses; disabled when empty")
 	refreshStr := flag.String("refresh", "07:00,11:00,14:00,17:00",
 		"comma-separated HH:MM times to refresh today's menu (local time)")
 	flag.Parse()
@@ -500,7 +509,16 @@ func main() {
 		log.Fatal("no valid refresh times parsed from --refresh flag")
 	}
 
-	srv := &server{cache: newCache(), baseURL: strings.TrimRight(*baseURL, "/")}
+	menuCache, err := newCache(*cacheDir)
+	if err != nil {
+		log.Fatalf("initialize cache: %v", err)
+	}
+	if *cacheDir == "" {
+		log.Printf("persistent cache disabled; use --cache-dir to retain responses across restarts")
+	} else {
+		log.Printf("persistent cache: %s", *cacheDir)
+	}
+	srv := &server{cache: menuCache, baseURL: strings.TrimRight(*baseURL, "/")}
 
 	// Background scheduler refreshes today's data at configured times.
 	go srv.runScheduler(refreshTimes)

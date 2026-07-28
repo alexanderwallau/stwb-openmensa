@@ -35,6 +35,12 @@ in
       '';
     };
 
+    cacheDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/stwb-openmensa";
+      description = "Directory used to persist cached menu responses across service restarts.";
+    };
+
     user = lib.mkOption {
       type = lib.types.str;
       default = "stwb-openmensa";
@@ -69,6 +75,7 @@ in
           "--port"    (toString cfg.port)
           "--listen"  cfg.listenAddress
           "--refresh" (lib.concatStringsSep "," cfg.refreshTimes)
+          "--cache-dir" cfg.cacheDir
         ]);
 
         User  = cfg.user;
@@ -76,6 +83,8 @@ in
 
         Restart    = "on-failure";
         RestartSec = "10s";
+        StateDirectory = lib.optional (cfg.cacheDir == "/var/lib/stwb-openmensa") "stwb-openmensa";
+        ReadWritePaths = lib.optional (cfg.cacheDir != "/var/lib/stwb-openmensa") cfg.cacheDir;
 
         # Hardening
         NoNewPrivileges      = true;
